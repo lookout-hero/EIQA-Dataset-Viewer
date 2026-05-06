@@ -1,145 +1,204 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>眼科 VQA 数据集可视化</title>
-    <!-- 引入 Tailwind CSS 进行快速美化 -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>QA Dataset Viewer</title>
     <style>
-        table { table-layout: fixed; width: 100%; }
-        td { word-wrap: break-word; vertical-align: top; }
-        .col-img { width: 15%; }
-        .col-url { width: 10%; }
-        .col-dim { width: 10%; }
-        .col-q   { width: 20%; }
-        .col-a   { width: 20%; }
-        .col-r   { width: 25%; }
-        /* 图片放大悬浮效果 */
-        .zoom-img { transition: transform 0.2s ease-in-out; cursor: pointer; }
-        .zoom-img:hover { transform: scale(2.0); z-index: 50; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            /* 在小屏幕上允许横向滚动 */
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            /* 固定列宽，避免长文本撑爆表格 */
+            min-width: 1200px;
+        }
+
+        th,
+        td {
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            /* 允许长单词换行 */
+        }
+
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        img {
+            max-width: 150px;
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        img:hover {
+            transform: scale(1.05);
+            /* 鼠标悬浮图片稍微放大 */
+        }
+
+        a {
+            color: #0366d6;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* 定义列宽比例 */
+        .col-image {
+            width: 170px;
+        }
+
+        .col-url {
+            width: 120px;
+        }
+
+        .col-dim {
+            width: 100px;
+        }
+
+        .col-q {
+            width: 20%;
+        }
+
+        .col-a {
+            width: 20%;
+        }
+
+        .col-r {
+            width: 30%;
+        }
     </style>
 </head>
-<body class="bg-gray-100 p-6">
 
-    <div class="max-w-full mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <h1 class="text-xl font-bold text-gray-800">👁️ 眼科 VQA 案例数据展示</h1>
-            
-            <!-- 新增：数据过滤器 UI -->
-            <div class="flex items-center space-x-4">
-                <select id="data-filter" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm">
-                    <option value="clean" selected>✨ 仅看纯净版 (眼底图/OCT)</option>
-                    <option value="all">📁 显示全部原始数据</option>
-                </select>
-                <span class="text-sm font-semibold text-blue-600 bg-blue-100 px-3 py-1 rounded-full" id="data-count">加载中...</span>
-            </div>
-        </div>
-        
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border-collapse">
-                <thead class="bg-gray-800 text-white text-left">
-                    <tr>
-                        <th class="py-3 px-4 border col-img">image</th>
-                        <th class="py-3 px-4 border col-url">case_url</th>
-                        <th class="py-3 px-4 border col-dim">dimension</th>
-                        <th class="py-3 px-4 border col-q">question</th>
-                        <th class="py-3 px-4 border col-a">answer</th>
-                        <th class="py-3 px-4 border col-r">reasoning_step</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body" class="text-gray-700 text-sm">
-                    <!-- 数据将由 JavaScript 动态填入这里 -->
-                </tbody>
-            </table>
-        </div>
+<body>
+
+    <h1>QA Dataset Viewer</h1>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-image">image</th>
+                    <th class="col-url">case_url</th>
+                    <th class="col-dim">dimension</th>
+                    <th class="col-q">question</th>
+                    <th class="col-a">answer</th>
+                    <th class="col-r">reasoning_step</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- 数据将由 JavaScript 动态插入 -->
+                <tr>
+                    <td colspan="6" style="text-align: center;">加载数据中...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
-    <!-- 引入数据文件 -->
-    <script src="data.js"></script>
-    
-    <!-- 渲染与过滤逻辑 -->
     <script>
-        if (typeof vqaData !== 'undefined') {
-            
-            // 🚫 黑名单关键词库：凡是问题或推理中包含这些词的，都认为是“无关图表或皮肤照”
-            const excludeKeywords =[
-                "ganglion cell",       // 排除神经节细胞分析报告
-                "deviation map",       // 排除厚度偏差图
-                "thickness map",       // 排除厚度图报告
-                "goldmann",            // 排除 Goldmann 视野测试图
-                "visual field",        // 排除视野测试图 (范围扩大，拦截更多)
-                "a-scan",              // 排除 A超 波形图
-                "b-scan",              // 🛑 新增：排除 B超 (眼科超声)
-                "ultrasound",          // 🛑 新增：排除 提到超声波的图片
-                "echography",          // 🛑 新增：排除 提到超声回声的图片
-                "sole of the foot",    // 排除脚底照 (如梅毒案例)
-                "cutaneous",           // 排除皮肤病变照
-                "neck",                 // 排除颈部皮肤照 (如 PXE 案例)
-                "fluorescein",
-                "angiogram"
-            ];
-
-            const tbody = document.getElementById('table-body');
-            const countLabel = document.getElementById('data-count');
-
-            // 核心渲染函数
-            function renderTable(filterMode) {
-                tbody.innerHTML = ''; // 先清空表格
-                let displayData =[];
-
-                if (filterMode === 'clean') {
-                    // 执行过滤逻辑
-                    displayData = vqaData.filter(item => {
-                        // 把问答和推理的文本合并并转为小写
-                        const fullText = (item.question + " " + item.answer + " " + item.reasoning).toLowerCase();
-                        // 检查是否包含任何黑名单关键词，如果没有包含，就保留 (return true)
-                        const hasJunkKeyword = excludeKeywords.some(kw => fullText.includes(kw));
-                        return !hasJunkKeyword; 
-                    });
-                } else {
-                    displayData = vqaData; // 显示全部
+        // 异步加载 JSON 数据
+        async function loadData() {
+            try {
+                // 读取同目录下的 data.json 文件
+                const response = await fetch('data.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                const data = await response.json();
 
-                // 更新数量标签
-                countLabel.innerText = `显示 ${displayData.length} / 共 ${vqaData.length} 条`;
+                const tbody = document.getElementById('table-body');
+                tbody.innerHTML = ''; // 清空“加载中”提示
 
-                // 遍历渲染表格
-                displayData.forEach((item, index) => {
+                // 遍历数据并生成表格行
+                data.forEach(item => {
                     const tr = document.createElement('tr');
-                    tr.className = index % 2 === 0 ? "bg-white hover:bg-blue-50" : "bg-gray-50 hover:bg-blue-50";
-                    const shortUrl = item.case_url.split('/').pop() || "Link";
 
-                    tr.innerHTML = `
-                        <td class="py-3 px-4 border text-center">
-                            <img src="${item.image_path}" alt="case image" class="w-full max-w-[200px] h-auto object-cover rounded shadow-sm zoom-img" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=Not+Found';">
-                        </td>
-                        <td class="py-3 px-4 border">
-                            <a href="${item.case_url}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline break-all">${shortUrl}</a>
-                        </td>
-                        <td class="py-3 px-4 border">
-                            <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">${item.clinical_dimension}</span>
-                            <div class="mt-2 text-xs text-gray-500">Score: <span class="font-bold text-green-600">${item.quality_meta.total_score}</span></div>
-                        </td>
-                        <td class="py-3 px-4 border whitespace-pre-wrap">${item.question}</td>
-                        <td class="py-3 px-4 border font-medium text-gray-900 whitespace-pre-wrap">${item.answer}</td>
-                        <td class="py-3 px-4 border whitespace-pre-wrap text-gray-600 leading-relaxed">${item.reasoning}</td>
-                    `;
+                    // 1. image
+                    const tdImg = document.createElement('td');
+                    // 假设你的图片放在相对路径下
+                    tdImg.innerHTML = `<a href="${item.image_path}" target="_blank"><img src="${item.image_path}" alt="image" loading="lazy" /></a>`;
+                    tr.appendChild(tdImg);
+
+                    // 2. case_url
+                    const tdUrl = document.createElement('td');
+                    tdUrl.innerHTML = `<a href="${item.case_url}" target="_blank">${item.case_url}</a>`;
+                    tr.appendChild(tdUrl);
+
+                    // 3. dimension (由于你的JSON中没有直接叫dimension的字段，这里使用 disease_id 作为示例，你可以根据需要改成 ppp_decision_point 或其他字段)
+                    const tdDim = document.createElement('td');
+                    tdDim.textContent = item.disease_id || "N/A";
+                    tr.appendChild(tdDim);
+
+                    // 4. question
+                    const tdQ = document.createElement('td');
+                    tdQ.textContent = item.question;
+                    tr.appendChild(tdQ);
+
+                    // 5. answer
+                    const tdA = document.createElement('td');
+                    tdA.textContent = item.answer;
+                    tr.appendChild(tdA);
+
+                    // 6. reasoning_step
+                    const tdR = document.createElement('td');
+                    // JSON中的 reasoning 包含了换行符或步骤，可以稍微处理一下让展示更好看
+                    let reasoningText = item.reasoning;
+                    // 如果需要在网页中显示换行，可以将文本中的 "\n" 替换为 "<br>" (当前数据看似是单行字符串)
+                    tdR.innerHTML = reasoningText;
+                    tr.appendChild(tdR);
+
                     tbody.appendChild(tr);
                 });
+            } catch (error) {
+                console.error("加载数据失败:", error);
+                document.getElementById('table-body').innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">加载数据失败，请确保本地服务器已启动或在 GitHub Pages 上访问。错误信息：${error.message}</td></tr>`;
             }
-
-            // 监听下拉框变化事件
-            document.getElementById('data-filter').addEventListener('change', (e) => {
-                renderTable(e.target.value);
-            });
-
-            // 初始加载时，默认使用纯净模式
-            renderTable('clean');
-
-        } else {
-            document.getElementById('table-body').innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-500 font-bold">错误：未能加载 data.js</td></tr>`;
         }
+
+        // 页面加载完成后执行
+        window.addEventListener('DOMContentLoaded', loadData);
     </script>
 </body>
+
 </html>
