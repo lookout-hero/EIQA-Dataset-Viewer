@@ -15,13 +15,46 @@
 
         h1 {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
+        }
+
+        .summary {
+            text-align: center;
+            color: #666;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .toolbar input,
+        .toolbar button {
+            height: 34px;
+            border: 1px solid #cfd7df;
+            border-radius: 6px;
+            background: #fff;
+            padding: 0 10px;
+            font: inherit;
+            font-size: 14px;
+        }
+
+        .toolbar input {
+            width: min(460px, 90vw);
+        }
+
+        .toolbar button {
+            cursor: pointer;
         }
 
         .table-container {
             width: 100%;
             overflow-x: auto;
-            /* 在小屏幕上允许横向滚动 */
             background-color: #fff;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
@@ -30,8 +63,7 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
-            /* 固定列宽，避免长文本撑爆表格 */
-            min-width: 1200px;
+            min-width: 1500px;
         }
 
         th,
@@ -41,7 +73,7 @@
             text-align: left;
             vertical-align: top;
             word-wrap: break-word;
-            /* 允许长单词换行 */
+            overflow-wrap: anywhere;
         }
 
         th {
@@ -71,7 +103,6 @@
 
         img:hover {
             transform: scale(1.05);
-            /* 鼠标悬浮图片稍微放大 */
         }
 
         a {
@@ -84,36 +115,83 @@
             text-decoration: underline;
         }
 
-        /* 定义列宽比例 */
         .col-image {
-            width: 170px;
+            width: 180px;
         }
 
         .col-url {
-            width: 120px;
+            width: 180px;
         }
 
         .col-dim {
-            width: 100px;
+            width: 280px;
         }
 
         .col-q {
-            width: 20%;
+            width: 260px;
         }
 
         .col-a {
-            width: 20%;
+            width: 320px;
         }
 
         .col-r {
-            width: 30%;
+            width: 380px;
+        }
+
+        .kv {
+            margin-bottom: 8px;
+        }
+
+        .key {
+            display: inline-block;
+            margin-right: 4px;
+            color: #59636e;
+            font-weight: 700;
+        }
+
+        .text-block {
+            white-space: pre-wrap;
+        }
+
+        details {
+            margin-top: 8px;
+        }
+
+        summary {
+            cursor: pointer;
+            color: #0366d6;
+            font-weight: 700;
+        }
+
+        pre {
+            max-height: 420px;
+            overflow: auto;
+            margin: 8px 0 0;
+            padding: 10px;
+            border: 1px solid #d8dee4;
+            border-radius: 6px;
+            background: #f6f8fa;
+            color: #24292f;
+            white-space: pre-wrap;
+            font: 12px/1.45 Consolas, "SFMono-Regular", Menlo, monospace;
+        }
+
+        .error {
+            text-align: center;
+            color: #b3261e;
         }
     </style>
 </head>
 
 <body>
-
     <h1>QA Dataset Viewer</h1>
+    <div class="summary" id="summary">加载数据中...</div>
+    <div class="toolbar">
+        <input id="search" type="search" placeholder="搜索任意字段内容">
+        <button id="expand-all" type="button">展开全部</button>
+        <button id="collapse-all" type="button">收起全部</button>
+    </div>
 
     <div class="table-container">
         <table>
@@ -128,7 +206,6 @@
                 </tr>
             </thead>
             <tbody id="table-body">
-                <!-- 数据将由 JavaScript 动态插入 -->
                 <tr>
                     <td colspan="6" style="text-align: center;">加载数据中...</td>
                 </tr>
@@ -137,66 +214,211 @@
     </div>
 
     <script>
-        // 异步加载 JSON 数据
+        let dataset = [];
+
+        function normalizeData(raw) {
+            if (Array.isArray(raw)) return raw;
+            if (raw && Array.isArray(raw.data)) return raw.data;
+            if (raw && Array.isArray(raw.items)) return raw.items;
+            if (raw && Array.isArray(raw.records)) return raw.records;
+            return raw ? [raw] : [];
+        }
+
+        function stringify(value) {
+            if (value === undefined || value === null) return '';
+            if (typeof value === 'string') return value;
+            return JSON.stringify(value);
+        }
+
+        function appendText(parent, text, className = '') {
+            const div = document.createElement('div');
+            if (className) div.className = className;
+            div.textContent = text === undefined || text === null || text === '' ? 'N/A' : String(text);
+            parent.appendChild(div);
+            return div;
+        }
+
+        function appendKV(parent, key, value) {
+            if (value === undefined || value === null || value === '') return;
+            const div = document.createElement('div');
+            div.className = 'kv';
+            const label = document.createElement('span');
+            label.className = 'key';
+            label.textContent = `${key}:`;
+            div.appendChild(label);
+            div.appendChild(document.createTextNode(` ${String(value)}`));
+            parent.appendChild(div);
+        }
+
+        function appendJsonDetails(parent, title, value, open = false) {
+            if (value === undefined || value === null) return;
+            const details = document.createElement('details');
+            details.open = open;
+            const summary = document.createElement('summary');
+            summary.textContent = title;
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(value, null, 2);
+            details.appendChild(summary);
+            details.appendChild(pre);
+            parent.appendChild(details);
+        }
+
+        function appendLink(parent, href, text) {
+            if (!href) {
+                appendText(parent, 'N/A');
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = href;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = text || href;
+            parent.appendChild(a);
+        }
+
+        function createImageCell(item) {
+            const td = document.createElement('td');
+            if (item.image_path) {
+                const a = document.createElement('a');
+                a.href = item.image_path;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                const img = document.createElement('img');
+                img.src = item.image_path;
+                img.alt = item.case_title || item.image_path || 'image';
+                img.loading = 'lazy';
+                a.appendChild(img);
+                td.appendChild(a);
+                appendKV(td, 'image_path', item.image_path);
+            } else {
+                appendText(td, 'N/A');
+            }
+            appendKV(td, 'image_type', item.image_type);
+            return td;
+        }
+
+        function createUrlCell(item) {
+            const td = document.createElement('td');
+            appendKV(td, 'case_title', item.case_title);
+            appendLink(td, item.case_url, item.case_url);
+            return td;
+        }
+
+        function createDimensionCell(item) {
+            const td = document.createElement('td');
+            appendKV(td, 'disease_id', item.disease_id);
+            appendKV(td, 'perspective_id', item.perspective_id);
+            appendKV(td, 'ppp_level', item.ppp_level);
+            appendKV(td, 'ppp_decision_point', item.ppp_decision_point);
+            appendKV(td, 'rag_supported', item.rag_supported);
+            appendJsonDetails(td, 'confirmed_features', item.confirmed_features, true);
+            appendJsonDetails(td, 'quality_meta', item.quality_meta);
+            appendJsonDetails(td, 'question_score_report', item.question_score_report);
+
+            const shownKeys = new Set([
+                'image_path',
+                'image_type',
+                'case_title',
+                'case_url',
+                'disease_id',
+                'perspective_id',
+                'ppp_level',
+                'ppp_decision_point',
+                'rag_supported',
+                'confirmed_features',
+                'quality_meta',
+                'question_score_report',
+                'question',
+                'answer',
+                'reasoning',
+                'reasoning_blueprint'
+            ]);
+            const extra = {};
+            Object.keys(item).forEach(key => {
+                if (!shownKeys.has(key)) extra[key] = item[key];
+            });
+            if (Object.keys(extra).length) appendJsonDetails(td, 'extra_fields', extra);
+            return td;
+        }
+
+        function createQuestionCell(item) {
+            const td = document.createElement('td');
+            appendText(td, item.question, 'text-block');
+            return td;
+        }
+
+        function createAnswerCell(item) {
+            const td = document.createElement('td');
+            appendText(td, item.answer, 'text-block');
+            return td;
+        }
+
+        function createReasoningCell(item) {
+            const td = document.createElement('td');
+            appendKV(td, 'reasoning', '');
+            appendText(td, item.reasoning, 'text-block');
+            appendJsonDetails(td, 'reasoning_blueprint', item.reasoning_blueprint, true);
+            appendJsonDetails(td, '完整原始记录', item);
+            return td;
+        }
+
+        function rowMatches(item, query) {
+            if (!query) return true;
+            return stringify(item).toLowerCase().includes(query);
+        }
+
+        function render() {
+            const tbody = document.getElementById('table-body');
+            const query = document.getElementById('search').value.trim().toLowerCase();
+            const rows = dataset.filter(item => rowMatches(item, query));
+            tbody.innerHTML = '';
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">没有匹配的数据</td></tr>';
+            } else {
+                const fragment = document.createDocumentFragment();
+                rows.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.appendChild(createImageCell(item));
+                    tr.appendChild(createUrlCell(item));
+                    tr.appendChild(createDimensionCell(item));
+                    tr.appendChild(createQuestionCell(item));
+                    tr.appendChild(createAnswerCell(item));
+                    tr.appendChild(createReasoningCell(item));
+                    fragment.appendChild(tr);
+                });
+                tbody.appendChild(fragment);
+            }
+
+            document.getElementById('summary').textContent =
+                `data.json 共 ${dataset.length} 条，当前显示 ${rows.length} 条。`;
+        }
+
         async function loadData() {
             try {
-                // 读取同目录下的 data.json 文件
                 const response = await fetch('data.json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-
-                const tbody = document.getElementById('table-body');
-                tbody.innerHTML = ''; // 清空“加载中”提示
-
-                // 遍历数据并生成表格行
-                data.forEach(item => {
-                    const tr = document.createElement('tr');
-
-                    // 1. image
-                    const tdImg = document.createElement('td');
-                    // 假设你的图片放在相对路径下
-                    tdImg.innerHTML = `<a href="${item.image_path}" target="_blank"><img src="${item.image_path}" alt="image" loading="lazy" /></a>`;
-                    tr.appendChild(tdImg);
-
-                    // 2. case_url
-                    const tdUrl = document.createElement('td');
-                    tdUrl.innerHTML = `<a href="${item.case_url}" target="_blank">${item.case_url}</a>`;
-                    tr.appendChild(tdUrl);
-
-                    // 3. dimension (由于你的JSON中没有直接叫dimension的字段，这里使用 disease_id 作为示例，你可以根据需要改成 ppp_decision_point 或其他字段)
-                    const tdDim = document.createElement('td');
-                    tdDim.textContent = item.disease_id || "N/A";
-                    tr.appendChild(tdDim);
-
-                    // 4. question
-                    const tdQ = document.createElement('td');
-                    tdQ.textContent = item.question;
-                    tr.appendChild(tdQ);
-
-                    // 5. answer
-                    const tdA = document.createElement('td');
-                    tdA.textContent = item.answer;
-                    tr.appendChild(tdA);
-
-                    // 6. reasoning_step
-                    const tdR = document.createElement('td');
-                    // JSON中的 reasoning 包含了换行符或步骤，可以稍微处理一下让展示更好看
-                    let reasoningText = item.reasoning;
-                    // 如果需要在网页中显示换行，可以将文本中的 "\n" 替换为 "<br>" (当前数据看似是单行字符串)
-                    tdR.innerHTML = reasoningText;
-                    tr.appendChild(tdR);
-
-                    tbody.appendChild(tr);
-                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                dataset = normalizeData(await response.json());
+                render();
             } catch (error) {
-                console.error("加载数据失败:", error);
-                document.getElementById('table-body').innerHTML = `<tr><td colspan="6" style="text-align: center; color: red;">加载数据失败，请确保本地服务器已启动或在 GitHub Pages 上访问。错误信息：${error.message}</td></tr>`;
+                console.error('加载数据失败:', error);
+                document.getElementById('summary').textContent = '加载失败';
+                document.getElementById('table-body').innerHTML =
+                    `<tr><td colspan="6" class="error">加载 data.json 失败：${error.message}。请通过本地 HTTP 服务或 GitHub Pages 访问。</td></tr>`;
             }
         }
 
-        // 页面加载完成后执行
+        document.getElementById('search').addEventListener('input', render);
+        document.getElementById('expand-all').addEventListener('click', () => {
+            document.querySelectorAll('details').forEach(details => {
+                details.open = true;
+            });
+        });
+        document.getElementById('collapse-all').addEventListener('click', () => {
+            document.querySelectorAll('details').forEach(details => {
+                details.open = false;
+            });
+        });
         window.addEventListener('DOMContentLoaded', loadData);
     </script>
 </body>
