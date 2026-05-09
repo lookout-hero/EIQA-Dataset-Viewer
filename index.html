@@ -63,7 +63,7 @@
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
-            min-width: 1500px;
+            min-width: 1650px;
         }
 
         th,
@@ -124,7 +124,7 @@
         }
 
         .col-dim {
-            width: 280px;
+            width: 360px;
         }
 
         .col-q {
@@ -152,6 +152,100 @@
 
         .text-block {
             white-space: pre-wrap;
+        }
+
+        .audit-panel {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #d8dee4;
+            border-left: 4px solid #4f6bed;
+            border-radius: 6px;
+            background: #fbfcfe;
+        }
+
+        .audit-title {
+            margin-bottom: 8px;
+            color: #24292f;
+            font-weight: 700;
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin: 6px 0;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 2px 7px;
+            background: #f6f8fa;
+            color: #24292f;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .badge.good {
+            border-color: #a7d8b8;
+            background: #ecf8ef;
+            color: #1a7f37;
+        }
+
+        .badge.warn {
+            border-color: #eac55f;
+            background: #fff8db;
+            color: #7a4b00;
+        }
+
+        .badge.danger {
+            border-color: #f0a7a7;
+            background: #fff1f1;
+            color: #b3261e;
+        }
+
+        .badge.info {
+            border-color: #9cc9ee;
+            background: #eef7ff;
+            color: #0550ae;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+            margin: 8px 0;
+        }
+
+        .score-item {
+            border: 1px solid #eaeef2;
+            border-radius: 6px;
+            padding: 6px 8px;
+            background: #fff;
+            font-size: 12px;
+        }
+
+        .score-label {
+            display: block;
+            color: #59636e;
+            font-weight: 700;
+        }
+
+        .score-value {
+            display: block;
+            margin-top: 2px;
+            color: #24292f;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .muted {
+            color: #59636e;
+            font-size: 12px;
         }
 
         details {
@@ -250,6 +344,62 @@
             parent.appendChild(div);
         }
 
+        function appendBadge(parent, text, variant = '') {
+            if (text === undefined || text === null || text === '') return;
+            const span = document.createElement('span');
+            span.className = variant ? `badge ${variant}` : 'badge';
+            span.textContent = String(text);
+            parent.appendChild(span);
+            return span;
+        }
+
+        function appendBadgeRow(parent, badges) {
+            const row = document.createElement('div');
+            row.className = 'badge-row';
+            badges.forEach(badge => appendBadge(row, badge.text, badge.variant));
+            if (row.childNodes.length) parent.appendChild(row);
+        }
+
+        function scoreVariant(score) {
+            if (typeof score !== 'number') return '';
+            if (score >= 90) return 'good';
+            if (score >= 80) return 'warn';
+            return 'danger';
+        }
+
+        function decisionVariant(value) {
+            const normalized = String(value || '').toUpperCase();
+            if (normalized.includes('APPROVE')) return 'good';
+            if (normalized.includes('REJECT') || normalized.includes('FAIL')) return 'danger';
+            if (normalized.includes('REWRITE')) return 'warn';
+            return 'info';
+        }
+
+        function appendScoreGrid(parent, scores) {
+            const grid = document.createElement('div');
+            grid.className = 'score-grid';
+            scores.forEach(item => {
+                if (item.value === undefined || item.value === null || item.value === '') return;
+                const box = document.createElement('div');
+                box.className = 'score-item';
+                const label = document.createElement('span');
+                label.className = 'score-label';
+                label.textContent = item.label;
+                const value = document.createElement('span');
+                value.className = 'score-value';
+                value.textContent = item.value;
+                box.appendChild(label);
+                box.appendChild(value);
+                grid.appendChild(box);
+            });
+            if (grid.childNodes.length) parent.appendChild(grid);
+        }
+
+        function appendIssueDetails(parent, title, issues, open = false) {
+            if (!Array.isArray(issues) || !issues.length) return;
+            appendJsonDetails(parent, `${title} (${issues.length})`, issues, open);
+        }
+
         function appendJsonDetails(parent, title, value, open = false) {
             if (value === undefined || value === null) return;
             const details = document.createElement('details');
@@ -261,6 +411,81 @@
             details.appendChild(summary);
             details.appendChild(pre);
             parent.appendChild(details);
+        }
+
+        function appendAuditSummary(parent, qualityMeta) {
+            if (!qualityMeta || typeof qualityMeta !== 'object') return;
+
+            const panel = document.createElement('div');
+            panel.className = 'audit-panel';
+
+            const title = document.createElement('div');
+            title.className = 'audit-title';
+            title.textContent = 'multi-agent audit';
+            panel.appendChild(title);
+
+            appendBadgeRow(panel, [
+                {
+                    text: qualityMeta.decision || 'decision: N/A',
+                    variant: decisionVariant(qualityMeta.decision)
+                },
+                {
+                    text: `action: ${qualityMeta.audit_action || 'N/A'}`,
+                    variant: decisionVariant(qualityMeta.audit_action)
+                },
+                {
+                    text: `score: ${qualityMeta.total_score ?? 'N/A'}`,
+                    variant: scoreVariant(qualityMeta.total_score)
+                }
+            ]);
+
+            appendScoreGrid(panel, [
+                { label: 'specialists', value: qualityMeta.specialist_total },
+                { label: 'chair', value: qualityMeta.aggregator_score },
+                { label: 'raw final', value: qualityMeta.raw_final_score },
+                { label: 'adjusted final', value: qualityMeta.adjusted_final_score }
+            ]);
+
+            if (qualityMeta.dimension_scores && typeof qualityMeta.dimension_scores === 'object') {
+                const dimensionBadges = Object.entries(qualityMeta.dimension_scores).map(([key, value]) => ({
+                    text: `${key}: ${value}`,
+                    variant: scoreVariant(value * 5)
+                }));
+                appendBadgeRow(panel, dimensionBadges);
+            }
+
+            const clinicalIssues = qualityMeta.clinical_strength_issues || [];
+            const languageIssues = qualityMeta.question_language_issues || [];
+            const criticalFails = qualityMeta.critical_fails || [];
+            const vetoFlags = qualityMeta.veto_flags || [];
+
+            appendBadgeRow(panel, [
+                {
+                    text: `soft clinical flags: ${clinicalIssues.length}`,
+                    variant: clinicalIssues.length ? 'warn' : 'good'
+                },
+                {
+                    text: `language flags: ${languageIssues.length}`,
+                    variant: languageIssues.length ? 'warn' : 'good'
+                },
+                {
+                    text: `critical fails: ${criticalFails.length}`,
+                    variant: criticalFails.length ? 'danger' : 'good'
+                },
+                {
+                    text: `veto flags: ${vetoFlags.length}`,
+                    variant: vetoFlags.length ? 'danger' : 'good'
+                }
+            ]);
+
+            appendIssueDetails(panel, 'clinical_strength_issues', clinicalIssues);
+            appendIssueDetails(panel, 'question_language_issues', languageIssues);
+            appendIssueDetails(panel, 'critical_fails', criticalFails, true);
+            appendIssueDetails(panel, 'veto_flags', vetoFlags, true);
+            appendJsonDetails(panel, 'aggregator_report', qualityMeta.aggregator_report);
+            appendJsonDetails(panel, 'specialist_reports', qualityMeta.specialist_reports);
+
+            parent.appendChild(panel);
         }
 
         function appendLink(parent, href, text) {
@@ -311,6 +536,7 @@
             appendKV(td, 'ppp_level', item.ppp_level);
             appendKV(td, 'ppp_decision_point', item.ppp_decision_point);
             appendKV(td, 'rag_supported', item.rag_supported);
+            appendAuditSummary(td, item.quality_meta);
             appendJsonDetails(td, 'confirmed_features', item.confirmed_features, true);
             appendJsonDetails(td, 'quality_meta', item.quality_meta);
             appendJsonDetails(td, 'question_score_report', item.question_score_report);
@@ -367,6 +593,36 @@
             return stringify(item).toLowerCase().includes(query);
         }
 
+        function getQualityMeta(item) {
+            return item && item.quality_meta && typeof item.quality_meta === 'object' ? item.quality_meta : {};
+        }
+
+        function getNumericScore(item) {
+            const qualityMeta = getQualityMeta(item);
+            const scoreKeys = ['total_score', 'adjusted_final_score', 'raw_final_score'];
+            for (const key of scoreKeys) {
+                const value = Number(qualityMeta[key]);
+                if (Number.isFinite(value)) return value;
+            }
+            return null;
+        }
+
+        function summarizeRows(rows) {
+            const scores = rows
+                .map(getNumericScore)
+                .filter(score => score !== null)
+                .sort((a, b) => a - b);
+            const median = scores.length ? scores[Math.floor(scores.length / 2)] : 'N/A';
+            const min = scores.length ? scores[0] : 'N/A';
+            const max = scores.length ? scores[scores.length - 1] : 'N/A';
+            return {
+                approved: rows.filter(item => String(getQualityMeta(item).decision || '').toUpperCase().includes('APPROVED')).length,
+                softRisks: rows.filter(item => (getQualityMeta(item).clinical_strength_issues || []).length).length,
+                languageIssues: rows.filter(item => (getQualityMeta(item).question_language_issues || []).length).length,
+                scoreText: `${min}/${median}/${max}`
+            };
+        }
+
         function render() {
             const tbody = document.getElementById('table-body');
             const query = document.getElementById('search').value.trim().toLowerCase();
@@ -390,8 +646,16 @@
                 tbody.appendChild(fragment);
             }
 
-            document.getElementById('summary').textContent =
-                `data.json 共 ${dataset.length} 条，当前显示 ${rows.length} 条。`;
+            const allStats = summarizeRows(dataset);
+            const visibleStats = summarizeRows(rows);
+            let summaryText =
+                `data.json 共 ${dataset.length} 条，当前显示 ${rows.length} 条。` +
+                `通过 ${allStats.approved}/${dataset.length}，分数 min/median/max ${allStats.scoreText}，` +
+                `软临床标记 ${allStats.softRisks} 条，语言标记 ${allStats.languageIssues} 条。`;
+            if (rows.length !== dataset.length) {
+                summaryText += ` 当前筛选：分数 ${visibleStats.scoreText}，软临床标记 ${visibleStats.softRisks} 条。`;
+            }
+            document.getElementById('summary').textContent = summaryText;
         }
 
         async function loadData() {
